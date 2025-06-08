@@ -8,4 +8,3 @@ root.render(
     <TankManager />
   </React.StrictMode>
 );
-cd ""
