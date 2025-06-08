@@ -76,27 +76,52 @@ def export_csv():
     output.seek(0)
     return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', as_attachment=True, download_name='tanks.csv')
 
-# Route to import tank data from CSV
-@app.route('/tanks/import', methods=['POST'])
-def import_csv():
-    if 'file' not in request.files:
-        return 'No file part', 400
-    file = request.files['file']
-    if file.filename == '':
-        return 'No selected file', 400
+# OLD Route to import tank data from CSV
+# @app.route('/tanks/import', methods=['POST'])
+# def import_csv():
+#     if 'file' not in request.files:
+#         return 'No file part', 400
+#     file = request.files['file']
+#     if file.filename == '':
+#         return 'No selected file', 400
+# 
+#     df = pd.read_csv(file)
+#     tanks.clear()
+#     for _, row in df.iterrows():
+#         tank = {
+#             'name': str(row['Tank Name']).strip(),
+#             'blend': str(row['Blend Number']).strip() if pd.notna(row['Blend Number']) else '',
+#             'is_empty': row['Is Empty'].strip().lower() == 'yes',
+#             'current_volume': float(row['Current Volume (gal)']) if pd.notna(row['Current Volume (gal)']) else 0.0,
+#             'capacity': float(row['Capacity (gal)']) if pd.notna(row['Capacity (gal)']) else 0.0
+#         }
+#         tanks.append(tank)
+#     return 'CSV Tanks uploaded successfully', 200
+app.config['TANKS'] = []
 
-    df = pd.read_csv(file)
-    tanks.clear()
+@app.route('/upload', methods=['POST'])
+def upload_csv():
+    file = request.files['file']
+    if not file:
+        return jsonify({'error': 'No file provided'}), 400
+    try:
+        df = pd.read_csv(file)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+    tanks = []
     for _, row in df.iterrows():
         tank = {
             'name': str(row['Tank Name']).strip(),
-            'blend': str(row['Blend Number']).strip() if pd.notna(row['Blend Number']) else '',
-            'is_empty': row['Is Empty'].strip().lower() == 'yes',
-            'current_volume': float(row['Current Volume (gal)']) if pd.notna(row['Current Volume (gal)']) else 0.0,
-            'capacity': float(row['Capacity (gal)']) if pd.notna(row['Capacity (gal)']) else 0.0
+            'blend': str(row['Blend Number']).strip(),
+            'is_empty': str(row['Is Empty']).lower() in ['yes', 'true', '1'],
+            'current_volume': float(row['Current Volume (gal)']),
+            'capacity': float(row['Capacity (gal)']),
         }
         tanks.append(tank)
-    return 'CSV Tanks uploaded successfully', 200
+
+    app.config['TANKS'] = tanks
+    return jsonify({'message': 'Upload successful!'})
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
