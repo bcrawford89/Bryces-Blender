@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, send_file, send_from_directory
 from collections import defaultdict
+import pandas as pd
 import csv
 import io
 import os
@@ -78,22 +79,24 @@ def export_csv():
 # Route to import tank data from CSV
 @app.route('/tanks/import', methods=['POST'])
 def import_csv():
+    if 'file' not in request.files:
+        return 'No file part', 400
     file = request.files['file']
-    if not file:
-        return jsonify({"error": "No file uploaded."}), 400
+    if file.filename == '':
+        return 'No selected file', 400
 
-    stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
-    reader = csv.DictReader(stream)
-    for row in reader:
-        tank_name = normalize_tank_name(row['name'])
-        tanks[tank_name] = {
-            "name": row['name'],
-            "blend": normalize_blend(row.get('blend')),
-            "is_empty": row.get('is_empty', 'true').lower() == 'true',
-            "current_volume": float(row.get('current_volume', 0)),
-            "capacity": float(row.get('capacity', 0))
+    df = pd.read_csv(file)
+    tanks.clear()
+    for _, row in df.iterrows():
+        tank = {
+            'name': str(row['Tank Name']).strip(),
+            'blend': str(row['Blend Number']).strip() if pd.notna(row['Blend Number']) else '',
+            'is_empty': row['Is Empty'].strip().lower() == 'yes',
+            'current_volume': float(row['Current Volume (gal)']) if pd.notna(row['Current Volume (gal)']) else 0.0,
+            'capacity': float(row['Capacity (gal)']) if pd.notna(row['Capacity (gal)']) else 0.0
         }
-    return jsonify({"message": "Tanks imported successfully."})
+        tanks.append(tank)
+    return 'CSV Tanks uploaded successfully', 200
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')

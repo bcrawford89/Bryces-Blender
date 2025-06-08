@@ -112,11 +112,26 @@ function TankManager() {
     fetchTanks();
   };
 
+  // File input change
+  const handleFileChange = (e) => {
+    setFile(e.target.files[0]);
+  };
+
+  // Upload button action
   const handleCSVUpload = async () => {
+    if (!file) return;
+
     const formData = new FormData();
     formData.append('file', file);
-    await axios.post('/tanks/upload_csv', formData);
-    fetchTanks();
+
+    try {
+      await axios.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      fetchTanks(); // Reload tanks after upload
+    } catch (error) {
+      console.error('Upload failed:', error);
+    }
   };
 
   return (
@@ -168,7 +183,7 @@ function TankManager() {
 
         <Box sx={{ mt: 3 }}>
           <Typography variant="h6">Upload Tank CSV</Typography>
-          <input type="file" accept=".csv" onChange={(e) => setFile(e.target.files[0])} />
+          <input type="file" accept=".csv" onChange={handleFileChange} />
           <BlueButton onClick={handleCSVUpload} sx={{ mt: 1 }}>Upload</BlueButton>
         </Box>
 
