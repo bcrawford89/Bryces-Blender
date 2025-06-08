@@ -1,1 +1,1 @@
-REACT_COMPONENT
+export default TankManager;
