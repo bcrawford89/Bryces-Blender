@@ -1,0 +1,16 @@
+
+{
+  "name": "wine-blender-ui",
+  "version": "1.0.0",
+  "dependencies": {
+    "@mui/material": "^5.0.0",
+    "axios": "^0.24.0",
+    "react": "^17.0.0",
+    "react-dom": "^17.0.0",
+    "react-scripts": "4.0.3"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build"
+  }
+}
