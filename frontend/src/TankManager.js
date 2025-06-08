@@ -29,6 +29,14 @@ const RedButton = styled(Button)(({ theme }) => ({
   },
 }));
 
+const GreenButton = styled(Button)(({ theme }) => ({
+  backgroundColor: '#36f446',
+  color: theme.palette.common.white,
+  '&:hover': {
+    backgroundColor: '#2fd33a',
+  },
+}));
+
 function TankManager() {
   const [tanks, setTanks] = useState([]);
   const [form, setForm] = useState({ name: '', blend: '', is_empty: true, current_volume: '', capacity: '' });
@@ -190,7 +198,7 @@ function TankManager() {
               onChange={(e) => setBlendName(e.target.value)}
               sx={{ mr: 2, mb: 2 }}
             />
-            <BlueButton onClick={saveCurrentBlend}>Save Blend</BlueButton>
+            <GreenButton onClick={saveCurrentBlend}>Save Blend</GreenButton>
             <TableContainer component={Paper} sx={{ maxWidth: 600, mt: 2 }}>
               <Table size="small">
                 <TableHead>
