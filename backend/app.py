@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, send_from_directory
 from collections import defaultdict
 import csv
 import io
@@ -93,6 +93,14 @@ def import_csv():
             "capacity": float(row.get('capacity', 0))
         }
     return jsonify({"message": "Tanks imported successfully."})
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_react_app(path):
+    if path != "" and os.path.exists(os.path.join("build", path)):
+        return send_from_directory('build', path)
+    else:
+        return send_from_directory('build', 'index.html')
 
 if __name__ == '__main__':
     app.run(debug=True)
