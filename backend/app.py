@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, send_file, send_from_directory
 from collections import defaultdict
 import csv
 import io
+import os
 
 app = Flask(__name__)
 
@@ -96,8 +97,8 @@ def import_csv():
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
-def serve_react_app(path):
-    if path != "" and os.path.exists(os.path.join("build", path)):
+def serve_react(path):
+    if path != "" and os.path.exists(os.path.join('build', path)):
         return send_from_directory('build', path)
     else:
         return send_from_directory('build', 'index.html')
