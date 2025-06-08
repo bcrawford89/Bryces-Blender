@@ -65,8 +65,14 @@ function TankManager() {
   };
 
   const fetchTransferPlan = async () => {
+  try {
     const res = await axios.get('/blend/plan');
     setTransferPlan(res.data.transfer_plan);
+    setBlendSummary({ blend_percentages: res.data.blend_percentages });
+  } catch (error) {
+    console.error('Transfer plan generation failed:', error.response?.data || error.message);
+    alert(error.response?.data?.message || 'Failed to generate transfer plan');
+  }
   };
 
   const fetchBlendHistoryList = async () => {
