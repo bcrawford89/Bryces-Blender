@@ -4,7 +4,7 @@ import csv
 import io
 import os
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="build", static_url_path="/")
 
 # In-memory storage for tanks
 tanks = {}
@@ -98,10 +98,10 @@ def import_csv():
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_react(path):
-    if path != "" and os.path.exists(os.path.join('build', path)):
-        return send_from_directory('build', path)
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
     else:
-        return send_from_directory('build', 'index.html')
+        return send_from_directory(app.static_folder, 'index.html')
 
 if __name__ == '__main__':
     import os
