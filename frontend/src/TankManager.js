@@ -15,7 +15,7 @@ const theme = createTheme({
 
 const BlueButton = styled(Button)(({ theme }) => ({
   backgroundColor: theme.palette.primary.main,
-  color: theme.palette.primary.main,
+  color: theme.palette.common.white,
   '&:hover': {
     backgroundColor: theme.palette.primary.dark,
   },
@@ -23,7 +23,7 @@ const BlueButton = styled(Button)(({ theme }) => ({
 
 const RedButton = styled(Button)(({ theme }) => ({
   backgroundColor: '#f44336',
-  color: '#f44336',
+  color: theme.palette.common.white,
   '&:hover': {
     backgroundColor: '#d32f2f',
   },
