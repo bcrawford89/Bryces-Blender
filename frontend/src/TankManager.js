@@ -143,7 +143,7 @@ function TankManager() {
   return (
     <ThemeProvider theme={theme}>
       <Box sx={{ p: 4 }}>
-        <Typography variant="h4" gutterBottom>Bryce's Blender, an efficient tank blending app</Typography>
+        <Typography variant="h4" gutterBottom>Bryce's Blender, an efficient wine blending app</Typography>
 
         <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
           <TextField label="Tank Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
