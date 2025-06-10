@@ -109,9 +109,10 @@ def upload_csv():
 
     tanks.clear()
     for _, row in df.iterrows():
+        blend_val = '' if pd.isna(row['Blend Number']) else str(row['Blend Number'])
         tank = {
             'name': str(row['Tank Name']).strip(),
-            'blend': normalize_blend(row['Blend Number']),
+            'blend': normalize_blend(blend_val),
             'is_empty': str(row['Is Empty']).lower() in ['yes', 'true', '1'],
             'current_volume': float(row['Current Volume (gal)']),
             'capacity': float(row['Capacity (gal)']),
