@@ -143,7 +143,7 @@ function TankManager() {
   return (
     <ThemeProvider theme={theme}>
       <Box sx={{ p: 4 }}>
-        <Typography variant="h4" gutterBottom>Tank Manager</Typography>
+        <Typography variant="h4" gutterBottom>Bryce's Blender, an efficient tank blending app</Typography>
 
         <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
           <TextField label="Tank Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -161,9 +161,9 @@ function TankManager() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Name</TableCell>
+                <TableCell>Tank</TableCell>
                 <TableCell>Blend</TableCell>
-                <TableCell>Is Empty</TableCell>
+                <TableCell>Empty?</TableCell>
                 <TableCell>Current Volume</TableCell>
                 <TableCell>Capacity</TableCell>
                 <TableCell>Actions</TableCell>
@@ -188,20 +188,20 @@ function TankManager() {
         </TableContainer>
 
         <Box sx={{ mt: 3 }}>
-          <Typography variant="h6">Upload Tank CSV</Typography>
+          <Typography variant="h6">Upload CSV</Typography>
           <input type="file" accept=".csv" onChange={handleFileChange} />
           <BlueButton onClick={handleCSVUpload} sx={{ mt: 1 }}>Upload</BlueButton>
         </Box>
 
         <Box sx={{ mt: 4 }}>
           <Typography variant="h6">Blend Validation & Transfer Plan</Typography>
-          <BlueButton onClick={fetchBlendSummary} sx={{ mr: 2, mt: 1 }}>Validate Blend</BlueButton>
-          <BlueButton onClick={fetchTransferPlan} sx={{ mt: 1 }}>Generate Transfer Plan</BlueButton>
+          <BlueButton onClick={fetchBlendSummary} sx={{ mr: 2, mt: 1 }}>Blend Percentages</BlueButton>
+          <BlueButton onClick={fetchTransferPlan} sx={{ mt: 1 }}>Generate Blending Plan</BlueButton>
         </Box>
 
         {blendSummary && (
           <Box sx={{ mt: 3 }}>
-            <Typography>Global Blend Percentages:</Typography>
+            <Typography>Blend Percentages Total:</Typography>
             <ul>
               {Object.entries(blendSummary.blend_percentages).map(([blend, percent]) => (
                 <li key={blend}>{blend}: {percent.toFixed(4)}%</li>
@@ -224,19 +224,19 @@ function TankManager() {
               <Table size="small">
                 <TableHead>
                   <TableRow>
+                    <TableCell>Volume (gal)</TableCell>
+                    <TableCell>Blend</TableCell>
                     <TableCell>From Tank</TableCell>
                     <TableCell>To Tank</TableCell>
-                    <TableCell>Blend</TableCell>
-                    <TableCell>Volume (gal)</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {transferPlan.map((step, index) => (
                     <TableRow key={index}>
+                      <TableCell>{step.volume}</TableCell>
+                      <TableCell>{step.blend}</TableCell>
                       <TableCell>{step.from}</TableCell>
                       <TableCell>{step.to}</TableCell>
-                      <TableCell>{step.blend}</TableCell>
-                      <TableCell>{step.volume}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -275,19 +275,19 @@ function TankManager() {
                 <Table size="small">
                   <TableHead>
                     <TableRow>
+                      <TableCell>Volume (gal)</TableCell>
+                      <TableCell>Blend</TableCell>
                       <TableCell>From Tank</TableCell>
                       <TableCell>To Tank</TableCell>
-                      <TableCell>Blend</TableCell>
-                      <TableCell>Volume (gal)</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {historyDetails.transfer_plan.map((step, index) => (
                       <TableRow key={index}>
+                        <TableCell>{step.volume}</TableCell>
+                        <TableCell>{step.blend}</TableCell>
                         <TableCell>{step.from}</TableCell>
                         <TableCell>{step.to}</TableCell>
-                        <TableCell>{step.blend}</TableCell>
-                        <TableCell>{step.volume}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
