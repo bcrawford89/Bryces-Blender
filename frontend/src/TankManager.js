@@ -233,7 +233,7 @@ function TankManager() {
                 <TableBody>
                   {transferPlan.map((step, index) => (
                     <TableRow key={index}>
-                      <TableCell>{step.volume}</TableCell>
+                      <TableCell>{Math.round(step.volume)}</TableCell>
                       <TableCell>{step.blend}</TableCell>
                       <TableCell>{step.from}</TableCell>
                       <TableCell>{step.to}</TableCell>
@@ -284,7 +284,7 @@ function TankManager() {
                   <TableBody>
                     {historyDetails.transfer_plan.map((step, index) => (
                       <TableRow key={index}>
-                        <TableCell>{step.volume}</TableCell>
+                        <TableCell>{Math.round(step.volume)}</TableCell>
                         <TableCell>{step.blend}</TableCell>
                         <TableCell>{step.from}</TableCell>
                         <TableCell>{step.to}</TableCell>
