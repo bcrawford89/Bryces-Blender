@@ -39,6 +39,66 @@ def get_nonempty_tanks(tanks):
 def get_empty_tanks(tanks):
     return [t for t in tanks if t['is_empty'] or float(t.get('current_volume', 0)) == 0]
 
+def initialize_blend_breakdown(tanks):
+    """Set blend_breakdown for each tank based on initial state."""
+    for tank in tanks:
+        if "blend_breakdown" not in tank or not tank["blend_breakdown"]:
+            if tank.get("blend") and float(tank.get("current_volume", 0)) > 0:
+                tank["blend_breakdown"] = {tank["blend"]: float(tank["current_volume"])}
+            else:
+                tank["blend_breakdown"] = {}
+
+def transfer_wine(donor, recipient, volume):
+    """Transfer wine from donor to recipient, updating blend_breakdown."""
+    donor_vol = float(donor["current_volume"])
+    recipient_vol = float(recipient.get("current_volume", 0))
+    donor_breakdown = donor.get("blend_breakdown", {})
+    if not donor_breakdown:
+        donor_breakdown = {donor.get("blend", "Unknown"): donor_vol}
+    # Compute breakdown for this transfer
+    transfer_breakdown = {}
+    for blend, amt in donor_breakdown.items():
+        # Avoid divide by zero
+        transfer_breakdown[blend] = amt * (volume / donor_vol) if donor_vol > 0 else 0
+    # Update recipient's blend_breakdown
+    recipient_breakdown = recipient.get("blend_breakdown", {})
+    for blend, amt in transfer_breakdown.items():
+        recipient_breakdown[blend] = recipient_breakdown.get(blend, 0) + amt
+    recipient["blend_breakdown"] = recipient_breakdown
+    # Reduce donor's breakdown accordingly
+    for blend, amt in transfer_breakdown.items():
+        donor_breakdown[blend] -= amt
+    donor["blend_breakdown"] = {k: v for k, v in donor_breakdown.items() if v > 1e-3}
+    # Update volumes (optional, for bookkeeping)
+    donor["current_volume"] = donor_vol - volume
+    recipient["current_volume"] = recipient_vol + volume
+
+def blending_is_not_needed(working_tanks, global_blend_percentages, tolerance=1.0):
+    """Returns True if every tank with wine matches the global blend percentages within tolerance."""
+    tanks_with_wine = [t for t in working_tanks if float(t.get('current_volume', 0)) > 0]
+    if len(tanks_with_wine) == 1:
+        return True
+    for t in tanks_with_wine:
+        breakdown = t.get("blend_breakdown", {})
+        total = sum(breakdown.values())
+        if total == 0:
+            continue  # Skip tanks with no wine
+        for blend, pct in global_blend_percentages.items():
+            tank_amt = breakdown.get(blend, 0)
+            tank_pct = (tank_amt / total) * 100 if total > 0 else 0
+            if abs(tank_pct - pct) > tolerance:
+                return False
+        # Check for unknown/rogue blends
+        for blend in breakdown:
+            if blend not in global_blend_percentages:
+                rogue_pct = (breakdown[blend] / total) * 100
+                if rogue_pct > tolerance:
+                    return False
+    return True
+
+def get_tank_by_name(tank_list, name):
+    return next((t for t in tank_list if t['name'] == name), None)
+
 # --- Tank Management Endpoints ---
 
 @app.route('/tanks', methods=['GET'])
@@ -204,8 +264,7 @@ def consolidate_tanks_any_blend(tanks):
                     recipient['blend'] = donor_blend
                 blend_label = donor_blend if donor_blend else "Mixed"
                 # Do the transfer
-                donor['current_volume'] = 0
-                recipient['current_volume'] += donor_vol
+                transfer_wine(donor, recipient, donor_vol)
                 consolidation_steps.append({
                     'from': donor['name'],
                     'to': recipient['name'],
@@ -237,7 +296,8 @@ def generate_blend_plan():
 
     # Prepare tank data
     working_tanks = copy.deepcopy(tanks)
-    
+    initialize_blend_breakdown(working_tanks)
+
     # --- Consolidation step - blend agnostic ---
     consolidation_plan = consolidate_tanks_any_blend(working_tanks)
     for t in working_tanks:
@@ -251,6 +311,18 @@ def generate_blend_plan():
     # Now recalculate full/empty after consolidation
     full_tanks = [t for t in working_tanks if not t['is_empty'] and float(t.get('current_volume', 0)) > 0]
     empty_tanks = [t for t in working_tanks if t['is_empty'] or float(t.get('current_volume', 0)) == 0]
+
+    # Check if further blending is needed
+    if blending_is_not_needed(working_tanks, blend_percentages):
+        blend_gallons = {blend: round(gal, 4) for blend, gal in blend_totals.items()}
+        blend_percentages_out = {blend: round((gal / total_wine) * 100, 4) for blend, gal in blend_totals.items()}
+        return jsonify({
+            'transfer_plan': consolidation_plan,
+            'blend_percentages': blend_percentages_out,
+            'blend_gallons': blend_gallons,
+            'total_gallons': round(total_wine, 4),
+            'message': 'Consolidation completed; no further blending needed.'
+        })
 
     # --- BLEND LOGIC ---
 
@@ -266,6 +338,14 @@ def generate_blend_plan():
 
         # Copy tank states and blend levels
         trial_tanks = copy.deepcopy(full_tanks)
+        for t in trial_tanks:
+            # Ensure blend_breakdown is always present
+            if "blend_breakdown" not in t or not t["blend_breakdown"]:
+                if t.get("blend") and float(t.get("current_volume", 0)) > 0:
+                    t["blend_breakdown"] = {t["blend"]: float(t["current_volume"])}
+                else:
+                    t["blend_breakdown"] = {}
+
         blend_left = {b: blend_totals[b] for b in blend_totals}
         wine_left = total_wine
 
@@ -300,7 +380,16 @@ def generate_blend_plan():
                 if fill_amount <= 0:
                     continue
 
-            # Transfer wine from source tanks into this empty tank
+            # Find or add this etank in trial_tanks, always use the actual object
+            etank_trial = get_tank_by_name(trial_tanks, etank['name'])
+            if not etank_trial:
+                etank_trial = copy.deepcopy(etank)
+                etank_trial["blend_breakdown"] = {}
+                trial_tanks.append(etank_trial)
+            else:
+                if "blend_breakdown" not in etank_trial or not etank_trial["blend_breakdown"]:
+                    etank_trial["blend_breakdown"] = {}
+
             etank_fill = {b: 0.0 for b in blend_percentages}
             for blend, amount in blend_fill.items():
                 to_transfer = amount
@@ -314,11 +403,11 @@ def generate_blend_plan():
                     move = min(available, to_transfer)
                     if move <= 0:
                         continue
-                    src['current_volume'] = round(available - move, 4)
+                    transfer_wine(src, etank_trial, move)
                     etank_fill[blend] += move
                     plan.append({
                         'from': src['name'],
-                        'to': etank['name'],
+                        'to': etank_trial['name'],
                         'blend': blend,
                         'volume': move
                     })
