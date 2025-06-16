@@ -280,7 +280,7 @@ def generate_blend_plan():
     import copy
     import random
 
-    def approx_equal(a, b, tol=0.1):
+    def approx_equal(a, b, tol=1.0):
         return abs(a - b) <= tol
 
     # Calculate global blend ratios before any consolidation/blending
