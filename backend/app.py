@@ -173,45 +173,47 @@ def can_make_blend(target_ratios, source_tanks, target_tanks):
 
 def consolidate_tanks_any_blend(tanks):
     consolidation_steps = []
-    tanks_with_wine = [t for t in tanks if float(t['current_volume']) > 0]
-    tanks_with_space = [t for t in tanks if float(t['current_volume']) < float(t['capacity'])]
+    # Donors: all tanks that are not empty
+    donors = [t for t in tanks if float(t['current_volume']) > 0]
+    # Recipients: only partially filled tanks (not empty, not full)
+    recipients = [
+        t for t in tanks
+        if 0 < float(t['current_volume']) < float(t['capacity'])
+    ]
 
-    # Sort tanks for deterministic behavior
-    tanks_with_space = sorted(tanks_with_space, key=lambda t: (float(t['capacity']) - float(t['current_volume'])))
-    tanks_with_wine = sorted(tanks_with_wine, key=lambda t: float(t['current_volume']))
+    # Sort donors by increasing volume (empty the smallest first),
+    # recipients by decreasing available space
+    donors = sorted(donors, key=lambda t: float(t['current_volume']))
+    recipients = sorted(recipients, key=lambda t: (float(t['capacity']) - float(t['current_volume'])), reverse=True)
 
-    for donor in tanks_with_wine:
+    for donor in donors:
         donor_vol = float(donor['current_volume'])
         donor_blend = donor.get('blend', '')
         if donor_vol == 0:
             continue
-        for recipient in tanks_with_space:
+        for recipient in recipients:
             if donor['name'] == recipient['name']:
                 continue
-            recipient_vol = float(recipient['current_volume'])
-            recipient_blend = recipient.get('blend', '')
-            recipient_space = float(recipient['capacity']) - recipient_vol
-            if recipient_space >= donor_vol and donor_vol > 0:
-                # The blend label is always the donor's blend (or "Mixed" if donor is mixed)
-                blend_label = donor_blend if donor_blend else "Mixed"
-                # If recipient has a different blend (and is not empty), after move it becomes "Mixed"
-                if recipient_vol > 0 and recipient_blend != donor_blend:
+            rec_space = float(recipient['capacity']) - float(recipient['current_volume'])
+            if rec_space >= donor_vol:
+                # Determine blend labeling
+                rec_blend = recipient.get('blend', '')
+                if rec_blend and rec_blend != donor_blend:
                     recipient['blend'] = "Mixed"
                 else:
                     recipient['blend'] = donor_blend
-                # Transfer wine
+                blend_label = donor_blend if donor_blend else "Mixed"
+                # Do the transfer
                 donor['current_volume'] = 0
                 recipient['current_volume'] += donor_vol
                 consolidation_steps.append({
                     'from': donor['name'],
                     'to': recipient['name'],
-                    'blend_from': donor_blend,
-                    'blend_to': recipient_blend,
-                    'blend': blend_label if blend_label else "Mixed",
+                    'blend': blend_label,
                     'volume': donor_vol,
                     'type': 'consolidation'
                 })
-                break
+                break  # donor is empty now
     return consolidation_steps
 
 @app.route('/blend/plan', methods=['GET'])
