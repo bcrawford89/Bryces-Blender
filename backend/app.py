@@ -176,7 +176,7 @@ def consolidate_tanks_any_blend(tanks):
     tanks_with_wine = [t for t in tanks if float(t['current_volume']) > 0]
     tanks_with_space = [t for t in tanks if float(t['current_volume']) < float(t['capacity'])]
 
-    # Sort by available space (lowest first)
+    # Sort tanks for deterministic behavior
     tanks_with_space = sorted(tanks_with_space, key=lambda t: (float(t['capacity']) - float(t['current_volume'])))
     tanks_with_wine = sorted(tanks_with_wine, key=lambda t: float(t['current_volume']))
 
@@ -191,34 +191,27 @@ def consolidate_tanks_any_blend(tanks):
             recipient_vol = float(recipient['current_volume'])
             recipient_blend = recipient.get('blend', '')
             recipient_space = float(recipient['capacity']) - recipient_vol
-            # Only do the move if recipient can accept ALL of donor's wine
             if recipient_space >= donor_vol and donor_vol > 0:
-                # Decide blend label for this step
-                if recipient_vol == 0:
-                    # Recipient is empty, use donor's blend
-                    blend_label = donor_blend if donor_blend else "Mixed"
-                    recipient['blend'] = donor_blend  # Update recipient's blend
-                elif recipient_blend == donor_blend:
-                    # Same blend, keep the blend name
-                    blend_label = donor_blend if donor_blend else "Mixed"
+                # The blend label is always the donor's blend (or "Mixed" if donor is mixed)
+                blend_label = donor_blend if donor_blend else "Mixed"
+                # If recipient has a different blend (and is not empty), after move it becomes "Mixed"
+                if recipient_vol > 0 and recipient_blend != donor_blend:
+                    recipient['blend'] = "Mixed"
                 else:
-                    blend_label = "Mixed"
-                    recipient['blend'] = "Mixed"  # Mark recipient as mixed
-
-                # Move all wine from donor into recipient
+                    recipient['blend'] = donor_blend
+                # Transfer wine
                 donor['current_volume'] = 0
                 recipient['current_volume'] += donor_vol
-
                 consolidation_steps.append({
                     'from': donor['name'],
                     'to': recipient['name'],
                     'blend_from': donor_blend,
                     'blend_to': recipient_blend,
-                    'blend': blend_label,
+                    'blend': blend_label if blend_label else "Mixed",
                     'volume': donor_vol,
                     'type': 'consolidation'
                 })
-                break  # Donor is empty, move to next donor
+                break
     return consolidation_steps
 
 @app.route('/blend/plan', methods=['GET'])
@@ -229,10 +222,21 @@ def generate_blend_plan():
     def approx_equal(a, b, tol=0.1):
         return abs(a - b) <= tol
 
+    # Calculate global blend ratios before any consolidation/blending
+    blend_totals = {}
+    total_wine = 0
+    for t in tanks:
+        blend = normalize_blend(t.get('blend', ''))
+        gal = float(t.get('current_volume', 0))
+        if not t.get('is_empty', False) and gal > 0 and blend:
+            blend_totals[blend] = blend_totals.get(blend, 0) + gal
+            total_wine += gal
+    blend_percentages = {blend: (gal / total_wine) * 100 for blend, gal in blend_totals.items()}
+
     # Prepare tank data
     working_tanks = copy.deepcopy(tanks)
     
-    # --- NEW BLEND-AGNOSTIC CONSOLIDATION STEP ---
+    # --- Consolidation step - blend agnostic ---
     consolidation_plan = consolidate_tanks_any_blend(working_tanks)
     for t in working_tanks:
         t['is_empty'] = float(t.get('current_volume', 0)) == 0
@@ -242,26 +246,11 @@ def generate_blend_plan():
     full_tanks = [t for t in working_tanks if not t['is_empty'] and float(t.get('current_volume', 0)) > 0]
     empty_tanks = [t for t in working_tanks if t['is_empty'] or float(t.get('current_volume', 0)) == 0]
 
-#####This is where the old consolidation steps went#####
-
     # Now recalculate full/empty after consolidation
     full_tanks = [t for t in working_tanks if not t['is_empty'] and float(t.get('current_volume', 0)) > 0]
     empty_tanks = [t for t in working_tanks if t['is_empty'] or float(t.get('current_volume', 0)) == 0]
 
     # --- BLEND LOGIC ---
-    # 1. Calculate global blend ratios
-    blend_totals = {}
-    total_wine = 0
-    for t in full_tanks:
-        blend = normalize_blend(t.get('blend', ''))
-        gal = float(t.get('current_volume', 0))
-        blend_totals[blend] = blend_totals.get(blend, 0) + gal
-        total_wine += gal
-
-    if total_wine == 0 or not blend_totals:
-        return jsonify({'message': 'No wine to plan blend'}), 400
-
-    blend_percentages = {blend: (gal / total_wine) * 100 for blend, gal in blend_totals.items()}
 
     # Best plan tracking
     best_plan = None
@@ -309,7 +298,7 @@ def generate_blend_plan():
                 if fill_amount <= 0:
                     continue
 
-            # Actually transfer wine from source tanks into this empty tank
+            # Transfer wine from source tanks into this empty tank
             etank_fill = {b: 0.0 for b in blend_percentages}
             for blend, amount in blend_fill.items():
                 to_transfer = amount
