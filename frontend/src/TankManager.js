@@ -189,6 +189,7 @@ function TankManager() {
 
         <Box sx={{ mt: 3 }}>
           <Typography variant="h6">Upload CSV</Typography>
+          <Typography variant="subtitle1">Headers: Tank Name, Blend Number, Is Empty, Current Volume (gal), Capacity (gal)</Typography>
           <input type="file" accept=".csv" onChange={handleFileChange} />
           <BlueButton onClick={handleCSVUpload} sx={{ mt: 1 }}>Upload</BlueButton>
         </Box>

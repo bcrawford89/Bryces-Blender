@@ -171,6 +171,40 @@ def can_make_blend(target_ratios, source_tanks, target_tanks):
             return False
     return True
 
+def consolidate_tanks_any_blend(tanks):
+    consolidation_steps = []
+    tanks_with_wine = [t for t in tanks if float(t['current_volume']) > 0]
+    tanks_with_space = [t for t in tanks if float(t['current_volume']) < float(t['capacity'])]
+
+    # Sort by available space (smallest first)
+    tanks_with_space = sorted(tanks_with_space, key=lambda t: (float(t['capacity']) - float(t['current_volume'])))
+    tanks_with_wine = sorted(tanks_with_wine, key=lambda t: float(t['current_volume']))
+
+    for donor in tanks_with_wine:
+        if float(donor['current_volume']) == 0:
+            continue
+        for recipient in tanks_with_space:
+            if donor['name'] == recipient['name']:
+                continue
+            available = float(recipient['capacity']) - float(recipient['current_volume'])
+            if available <= 0:
+                continue
+            to_transfer = min(float(donor['current_volume']), available)
+            if to_transfer <= 0:
+                continue
+            donor['current_volume'] -= to_transfer
+            recipient['current_volume'] += to_transfer
+            consolidation_steps.append({
+                'from': donor['name'],
+                'to': recipient['name'],
+                'blend_from': donor.get('blend', ''),
+                'blend_to': recipient.get('blend', ''),
+                'volume': to_transfer
+            })
+            if float(donor['current_volume']) == 0:
+                break
+    return consolidation_steps
+
 @app.route('/blend/plan', methods=['GET'])
 def generate_blend_plan():
     import copy
@@ -181,42 +215,16 @@ def generate_blend_plan():
 
     # Prepare tank data
     working_tanks = copy.deepcopy(tanks)
-    # Tanks that have wine in them, not full
+    
+    # --- NEW BLEND-AGNOSTIC CONSOLIDATION STEP ---
+    consolidation_plan = consolidate_tanks_any_blend(working_tanks)
+    
+    # Update partial/full/empty tanks after consolidation
     partial_tanks = [t for t in working_tanks if not t['is_empty'] and 0 < float(t.get('current_volume', 0)) < float(t['capacity'])]
     full_tanks = [t for t in working_tanks if not t['is_empty'] and float(t.get('current_volume', 0)) > 0]
     empty_tanks = [t for t in working_tanks if t['is_empty'] or float(t.get('current_volume', 0)) == 0]
 
-    # --- CONSOLIDATION STEP ---
-    consolidation_plan = []
-    changed = True
-    while changed:
-        changed = False
-        # Sort partial tanks by how much empty space they have (descending)
-        partial_tanks_sorted = sorted([t for t in partial_tanks if float(t['current_volume']) < float(t['capacity'])],
-                                      key=lambda x: float(x['capacity']) - float(x['current_volume']), reverse=True)
-        for receiver in partial_tanks_sorted:
-            receiver_empty = float(receiver['capacity']) - float(receiver['current_volume'])
-            receiver_blend = normalize_blend(receiver.get('blend', ''))
-            # Find a donor tank of the same blend, not the receiver, with less wine than the receiver can accept
-            for donor in [t for t in partial_tanks if t['name'] != receiver['name'] and normalize_blend(t.get('blend', '')) == receiver_blend]:
-                donor_vol = float(donor['current_volume'])
-                if donor_vol > 0 and donor_vol <= receiver_empty:
-                    # Perform transfer
-                    receiver['current_volume'] += donor_vol
-                    donor['current_volume'] = 0
-                    donor['is_empty'] = True
-                    consolidation_plan.append({
-                        'from': donor['name'],
-                        'to': receiver['name'],
-                        'blend': receiver_blend,
-                        'volume': donor_vol
-                    })
-                    changed = True
-                    # Update lists
-                    partial_tanks = [t for t in partial_tanks if t['current_volume'] > 0]
-                    break
-            if changed:
-                break
+#####This is where the old consolidation steps went#####
 
     # After consolidation, update working_tanks, full_tanks, empty_tanks
     for move in consolidation_plan:
