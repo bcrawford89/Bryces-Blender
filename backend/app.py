@@ -218,23 +218,15 @@ def generate_blend_plan():
     
     # --- NEW BLEND-AGNOSTIC CONSOLIDATION STEP ---
     consolidation_plan = consolidate_tanks_any_blend(working_tanks)
-    
+    for t in working_tanks:
+        t['is_empty'] = float(t.get('current_volume', 0)) == 0
+
     # Update partial/full/empty tanks after consolidation
     partial_tanks = [t for t in working_tanks if not t['is_empty'] and 0 < float(t.get('current_volume', 0)) < float(t['capacity'])]
     full_tanks = [t for t in working_tanks if not t['is_empty'] and float(t.get('current_volume', 0)) > 0]
     empty_tanks = [t for t in working_tanks if t['is_empty'] or float(t.get('current_volume', 0)) == 0]
 
 #####This is where the old consolidation steps went#####
-
-    # After consolidation, update working_tanks, full_tanks, empty_tanks
-    for move in consolidation_plan:
-        # Apply consolidation to working_tanks
-        for t in working_tanks:
-            if t['name'] == move['from']:
-                t['current_volume'] = 0
-                t['is_empty'] = True
-            if t['name'] == move['to']:
-                t['current_volume'] += move['volume']
 
     # Now recalculate full/empty after consolidation
     full_tanks = [t for t in working_tanks if not t['is_empty'] and float(t.get('current_volume', 0)) > 0]
