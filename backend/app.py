@@ -337,7 +337,7 @@ def generate_blend_plan():
         shuffled_empties = copy.deepcopy(empty_tanks)
         random.shuffle(shuffled_empties)
 
-        trial_tanks = copy.deepcopy(full_tanks)
+        trial_tanks = copy.deepcopy(full_tanks) + copy.deepcopy(empty_tanks)
         for t in trial_tanks:
             if "blend_breakdown" not in t or not t["blend_breakdown"]:
                 if t.get("blend") and float(t.get("current_volume", 0)) > 0:
@@ -350,6 +350,7 @@ def generate_blend_plan():
 
         plan = copy.deepcopy(consolidation_plan)
 
+        # Move wine into empty tanks according to blend percentages
         for etank in shuffled_empties:
             if wine_left <= 0:
                 break
@@ -412,14 +413,30 @@ def generate_blend_plan():
                     wine_left -= move
                     to_transfer -= move
 
-        # After all transfers, check if each tank with wine matches the global ratio within tolerance
-        if blending_is_not_needed(trial_tanks, blend_percentages, tolerance=1.0):
-            used_tanks = [t for t in trial_tanks if float(t.get('current_volume', 0)) > 0]
-            if len(used_tanks) <= best_num_tanks:
-                if len(used_tanks) < best_num_tanks or len(plan) < best_num_transfers:
+        # Empty the original source tanks (they should be zero after transferring all wine)
+        source_tank_names = [t['name'] for t in full_tanks]
+        for t in trial_tanks:
+            if t['name'] in source_tank_names:
+                t['current_volume'] = 0
+                t['blend_breakdown'] = {}
+
+        # Only check blend ratios for tanks that have wine (should be the previously empty tanks)
+        tanks_with_wine = [t for t in trial_tanks if float(t.get('current_volume', 0)) > 0]
+        if blending_is_not_needed(tanks_with_wine, blend_percentages, tolerance=1.0):
+            if len(tanks_with_wine) <= best_num_tanks:
+                if len(tanks_with_wine) < best_num_tanks or len(plan) < best_num_transfers:
                     best_plan = copy.deepcopy(plan)
-                    best_num_tanks = len(used_tanks)
+                    best_num_tanks = len(tanks_with_wine)
                     best_num_transfers = len(plan)
+
+#old        # After all transfers, check if each tank with wine matches the global ratio within tolerance
+#        if blending_is_not_needed(trial_tanks, blend_percentages, tolerance=1.0):
+#            used_tanks = [t for t in trial_tanks if float(t.get('current_volume', 0)) > 0]
+#            if len(used_tanks) <= best_num_tanks:
+#                if len(used_tanks) < best_num_tanks or len(plan) < best_num_transfers:
+#                    best_plan = copy.deepcopy(plan)
+#                    best_num_tanks = len(used_tanks)
+#                    best_num_transfers = len(plan)
 
     if not best_plan:
         return jsonify({'message': 'Blending not possible. Please provide more empty tanks.'}), 400
