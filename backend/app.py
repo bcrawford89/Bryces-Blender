@@ -381,7 +381,7 @@ def generate_blend_plan():
         blend_gallons = {blend: round(gal, 4) for blend, gal in blend_totals.items()}
         blend_percentages_out = {blend: round((gal / total_wine) * 100, 4) for blend, gal in blend_totals.items()}
         return jsonify({
-            'transfer_plan': consolidation_plan,
+            'transfer_plan': consolidation_transfer_plan,
             'blend_percentages': blend_percentages_out,
             'blend_gallons': blend_gallons,
             'total_gallons': round(total_wine, 4),
@@ -412,7 +412,7 @@ def generate_blend_plan():
         blend_left = {b: blend_totals[b] for b in blend_totals}
         wine_left = total_wine
 
-        plan = copy.deepcopy(consolidation_plan)
+        plan = copy.deepcopy(consolidation_transfer_plan)
 
         # Move wine into empty tanks according to blend percentages
         for etank in shuffled_empties:
