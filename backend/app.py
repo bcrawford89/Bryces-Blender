@@ -280,7 +280,7 @@ def generate_blend_plan():
     import copy
     import random
 
-    def approx_equal(a, b, tol=1.0):
+    def approx_equal(a, b, tol=2.0):
         return abs(a - b) <= tol
 
     # Calculate global blend ratios before any consolidation/blending
@@ -364,7 +364,7 @@ def generate_blend_plan():
             t['is_empty'] = True
             t['current_volume'] = 0
             t['blend_breakdown'] = {}
-            
+
     # --- CONSOLIDATION STEP END ---
 
     # Update partial/full/empty tanks after consolidation
