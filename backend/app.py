@@ -298,10 +298,74 @@ def generate_blend_plan():
     working_tanks = copy.deepcopy(tanks)
     initialize_blend_breakdown(working_tanks)
 
-    # --- Consolidation step - blend agnostic ---
-    consolidation_plan = consolidate_tanks_any_blend(working_tanks)
+    # --- CONSOLIDATION STEP START ---
+
+    # Identify empty tanks and sort largest to smallest
+    empty_tanks = [t for t in working_tanks if t['is_empty'] or float(t.get('current_volume', 0)) == 0]
+    empty_tanks = sorted(empty_tanks, key=lambda t: -float(t['capacity']))
+
+    # Identify non-empty tanks (sources)
+    source_tanks = [t for t in working_tanks if not t['is_empty'] and float(t.get('current_volume', 0)) > 0]
+
+    consolidation_transfer_plan = []
+    wine_left = total_wine
+    consolidation_tanks = []
+    if empty_tanks and float(empty_tanks[0]['capacity']) >= total_wine:
+        consolidation_tanks = [{'tank': empty_tanks[0], 'amount': total_wine}]
+    else:
+        tanks_needed = []
+        for t in empty_tanks:
+            if wine_left <= 0:
+                break
+            fill_amt = min(float(t['capacity']), wine_left)
+            tanks_needed.append({'tank': t, 'amount': fill_amt})
+            wine_left -= fill_amt
+        if wine_left > 0:
+            return jsonify({'message': 'Not enough empty tank space for consolidation.'}), 400
+        consolidation_tanks = tanks_needed
+
+    # Move all wine into consolidation tanks using global blend proportions
+    blend_left = {b: blend_totals[b] for b in blend_totals}
+    wine_left = total_wine
+    for entry in consolidation_tanks:
+        t = entry['tank']
+        amt_needed = entry['amount']
+        blend_fill = {blend: amt_needed * pct / 100 for blend, pct in blend_percentages.items()}
+
+        for blend, amount in blend_fill.items():
+            amt_to_pull = amount
+            source_candidates = [s for s in source_tanks if s.get('blend_breakdown', {}).get(blend, 0) > 0]
+            for src in source_candidates:
+                available = src.get('blend_breakdown', {}).get(blend, 0)
+                move = min(available, amt_to_pull)
+                if move <= 0:
+                    continue
+                transfer_wine(src, t, move)
+                consolidation_transfer_plan.append({
+                    'from': src['name'],
+                    'to': t['name'],
+                    'blend': blend,
+                    'volume': move,
+                    'type': 'consolidation'
+                })
+                amt_to_pull -= move
+                blend_left[blend] -= move
+                wine_left -= move
+                if amt_to_pull <= 1e-6:
+                    break
+            if amt_to_pull > 1e-3:
+                return jsonify({'message': f'Not enough {blend} to consolidate.'}), 400
+        t['is_empty'] = False
+        t['current_volume'] = sum(blend_fill.values())
+        t['blend_breakdown'] = blend_fill.copy()
+    # All other tanks should now be empty except consolidation_tanks
     for t in working_tanks:
-        t['is_empty'] = float(t.get('current_volume', 0)) == 0
+        if t not in [entry['tank'] for entry in consolidation_tanks]:
+            t['is_empty'] = True
+            t['current_volume'] = 0
+            t['blend_breakdown'] = {}
+            
+    # --- CONSOLIDATION STEP END ---
 
     # Update partial/full/empty tanks after consolidation
     partial_tanks = [t for t in working_tanks if not t['is_empty'] and 0 < float(t.get('current_volume', 0)) < float(t['capacity'])]
@@ -309,8 +373,8 @@ def generate_blend_plan():
     empty_tanks = [t for t in working_tanks if t['is_empty'] or float(t.get('current_volume', 0)) == 0]
 
     # Now recalculate full/empty after consolidation
-    full_tanks = [t for t in working_tanks if not t['is_empty'] and float(t.get('current_volume', 0)) > 0]
-    empty_tanks = [t for t in working_tanks if t['is_empty'] or float(t.get('current_volume', 0)) == 0]
+    # full_tanks = [t for t in working_tanks if not t['is_empty'] and float(t.get('current_volume', 0)) > 0]
+    # empty_tanks = [t for t in working_tanks if t['is_empty'] or float(t.get('current_volume', 0)) == 0]
 
     # Check if further blending is needed
     if blending_is_not_needed(working_tanks, blend_percentages):
@@ -431,15 +495,6 @@ def generate_blend_plan():
                     best_plan = copy.deepcopy(plan)
                     best_num_tanks = len(tanks_with_wine)
                     best_num_transfers = len(plan)
-
-#old        # After all transfers, check if each tank with wine matches the global ratio within tolerance
-#        if blending_is_not_needed(trial_tanks, blend_percentages, tolerance=2.0):
-#            used_tanks = [t for t in trial_tanks if float(t.get('current_volume', 0)) > 0]
-#            if len(used_tanks) <= best_num_tanks:
-#                if len(used_tanks) < best_num_tanks or len(plan) < best_num_transfers:
-#                    best_plan = copy.deepcopy(plan)
-#                    best_num_tanks = len(used_tanks)
-#                    best_num_transfers = len(plan)
 
         print("==== BLEND DEBUG DUMP ====")
         print("blend_totals:", blend_totals)
