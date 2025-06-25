@@ -73,7 +73,7 @@ def transfer_wine(donor, recipient, volume):
     donor["current_volume"] = donor_vol - volume
     recipient["current_volume"] = recipient_vol + volume
 
-def blending_is_not_needed(working_tanks, global_blend_percentages, tolerance=1.0):
+def blending_is_not_needed(working_tanks, global_blend_percentages, tolerance=2.0):
     """Returns True if every tank with wine matches the global blend percentages within tolerance."""
     tanks_with_wine = [t for t in working_tanks if float(t.get('current_volume', 0)) > 0]
     if len(tanks_with_wine) == 1:
@@ -425,7 +425,7 @@ def generate_blend_plan():
 
         # Only check blend ratios for tanks that have wine (should be the previously empty tanks)
         tanks_with_wine = [t for t in trial_tanks if float(t.get('current_volume', 0)) > 0]
-        if blending_is_not_needed(tanks_with_wine, blend_percentages, tolerance=1.0):
+        if blending_is_not_needed(tanks_with_wine, blend_percentages, tolerance=2.0):
             if len(tanks_with_wine) <= best_num_tanks:
                 if len(tanks_with_wine) < best_num_tanks or len(plan) < best_num_transfers:
                     best_plan = copy.deepcopy(plan)
@@ -433,7 +433,7 @@ def generate_blend_plan():
                     best_num_transfers = len(plan)
 
 #old        # After all transfers, check if each tank with wine matches the global ratio within tolerance
-#        if blending_is_not_needed(trial_tanks, blend_percentages, tolerance=1.0):
+#        if blending_is_not_needed(trial_tanks, blend_percentages, tolerance=2.0):
 #            used_tanks = [t for t in trial_tanks if float(t.get('current_volume', 0)) > 0]
 #            if len(used_tanks) <= best_num_tanks:
 #                if len(used_tanks) < best_num_tanks or len(plan) < best_num_transfers:
@@ -450,7 +450,7 @@ def generate_blend_plan():
         print("Tanks at end of last attempt:")
         for t in trial_tanks:
             print(f"  {t['name']}: vol={t.get('current_volume', 0)}, breakdown={t.get('blend_breakdown', {})}")
-        print("blending_is_not_needed:", blending_is_not_needed([t for t in trial_tanks if float(t.get('current_volume', 0)) > 0], blend_percentages, tolerance=1.0))
+        print("blending_is_not_needed:", blending_is_not_needed([t for t in trial_tanks if float(t.get('current_volume', 0)) > 0], blend_percentages, tolerance=2.0))
 
     if not best_plan:
         return jsonify({'message': 'Blending not possible. Please provide more empty tanks.'}), 400
