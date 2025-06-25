@@ -438,16 +438,16 @@ def generate_blend_plan():
 #                    best_num_tanks = len(used_tanks)
 #                    best_num_transfers = len(plan)
 
-print("==== BLEND DEBUG DUMP ====")
-print("blend_totals:", blend_totals)
-print("blend_percentages:", blend_percentages)
-print("Attempted plans:", attempt+1)
-print("Last blend_left:", blend_left)
-print("Last wine_left:", wine_left)
-print("Tanks at end of last attempt:")
-for t in trial_tanks:
-    print(f"  {t['name']}: vol={t.get('current_volume', 0)}, breakdown={t.get('blend_breakdown', {})}")
-print("blending_is_not_needed:", blending_is_not_needed([t for t in trial_tanks if float(t.get('current_volume', 0)) > 0], blend_percentages, tolerance=1.0))
+        print("==== BLEND DEBUG DUMP ====")
+        print("blend_totals:", blend_totals)
+        print("blend_percentages:", blend_percentages)
+        print("Attempted plans:", attempt+1)
+        print("Last blend_left:", blend_left)
+        print("Last wine_left:", wine_left)
+        print("Tanks at end of last attempt:")
+        for t in trial_tanks:
+            print(f"  {t['name']}: vol={t.get('current_volume', 0)}, breakdown={t.get('blend_breakdown', {})}")
+        print("blending_is_not_needed:", blending_is_not_needed([t for t in trial_tanks if float(t.get('current_volume', 0)) > 0], blend_percentages, tolerance=1.0))
 
     if not best_plan:
         return jsonify({'message': 'Blending not possible. Please provide more empty tanks.'}), 400
