@@ -393,7 +393,10 @@ def generate_blend_plan():
             # For each blend, draw wine from source tanks and transfer
             for blend, amount in blend_fill.items():
                 to_transfer = amount
-                trial_sources = [t for t in trial_tanks if normalize_blend(t['blend']) == blend and float(t['current_volume']) > 0]
+                trial_sources = [
+                    t for t in trial_tanks
+                    if float(t.get('current_volume', 0)) > 0 and t.get('blend_breakdown', {}).get(blend, 0) > 0
+                ]
                 trial_sources.sort(key=lambda t: -float(t['current_volume']))
                 for src in trial_sources:
                     if to_transfer <= 0:
