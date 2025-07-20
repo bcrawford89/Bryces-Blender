@@ -147,29 +147,18 @@ def double_swap(tank_a, tank_b, tank_empty):
 
     return moves
 
-#def apply_transfer(tanks, move):
-#    """Apply a single transfer move to the tank list in place."""
-#    tank_from = next(t for t in tanks if t['name'] == move['from'])
-#    tank_to = next(t for t in tanks if t['name'] == move['to'])
-#
-#    # Subtract volume and blend from source tank
-#    tank_from['current_volume'] -= move['volume']
-#    for k, v in move['blend_breakdown'].items():
-#        tank_from['blend_breakdown'][k] = tank_from['blend_breakdown'].get(k, 0) - v
-#        # Clean up any zero (or negative) blend components
-#        if tank_from['blend_breakdown'][k] <= 0:
-#            del tank_from['blend_breakdown'][k]
-#
-#    # Add volume and blend to destination tank
-#    tank_to['current_volume'] += move['volume']
-#    for k, v in move['blend_breakdown'].items():
-#        tank_to['blend_breakdown'][k] = tank_to['blend_breakdown'].get(k, 0) + v
-
 def apply_transfer(tanks, move):
     """Apply a single transfer move to the tank list in place and check feasibility."""
     tank_from = next(t for t in tanks if t['name'] == move['from'])
     tank_to = next(t for t in tanks if t['name'] == move['to'])
 
+    # Ensure blend_breakdown exists
+    if "blend_breakdown" not in tank_from or tank_from["blend_breakdown"] is None:
+        tank_from["blend_breakdown"] = {}
+    if "blend_breakdown" not in tank_to or tank_to["blend_breakdown"] is None:
+        tank_to["blend_breakdown"] = {}
+
+    # Prevent over-filling a tank
     max_from = float(tank_from['current_volume'])
     max_to = float(tank_to['capacity']) - float(tank_to.get('current_volume', 0))
     amount = min(move['volume'], max_from, max_to)
@@ -531,7 +520,7 @@ def generate_blend_plan():
             tank_empty = empty_tanks[0]
             moves = double_swap(tank_a, tank_b, tank_empty)
             for move in moves:
-                apply_transfer(tanks, move)
+                apply_transfer(trial_tanks, move)
                 best_plan.append(move)
 
         # Move wine into empty tanks according to blend percentages
