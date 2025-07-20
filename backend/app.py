@@ -521,7 +521,7 @@ def generate_blend_plan():
             moves = double_swap(tank_a, tank_b, tank_empty)
             for move in moves:
                 apply_transfer(trial_tanks, move)
-                best_plan.append(move)
+                plan.append(move)
 
         # Move wine into empty tanks according to blend percentages
         for etank in shuffled_empties:
