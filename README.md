@@ -13,7 +13,7 @@ This is a web application for planning and executing optimal wine blending opera
   - Supports automatic consolidation into the largest tank(s) when possible.
 - **Blend History:**  
   - Save and retrieve historical blend plans.
-- **CSV Import/Export:**  
+- **CSV Import:**  
   - Easily import tank data or export current tank state.
 - **User-friendly Interface:**  
   - React frontend for easy interaction.

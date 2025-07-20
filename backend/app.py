@@ -99,6 +99,104 @@ def blending_is_not_needed(working_tanks, global_blend_percentages, tolerance=2.
 def get_tank_by_name(tank_list, name):
     return next((t for t in tank_list if t['name'] == name), None)
 
+def double_swap(tank_a, tank_b, tank_empty):
+    """
+    Perform a double-swap (cross-fill) between two partially full tanks (tank_a, tank_b)
+    and one empty tank (tank_empty).
+
+    Returns a list of movement actions, each a dict:
+        {
+            'from': tank_name,
+            'to': tank_name,
+            'volume': volume_to_move,
+            'blend_breakdown': {blend: volume, ...}  # for accurate record keeping
+        }
+    Does not update the original tanks (pure function).
+    """
+    moves = []
+
+    va = tank_a['current_volume']
+    vb = tank_b['current_volume']
+
+    # Step 1: Move half of the first tank's current volume to an empty tank
+    move_a_to_e = va / 2
+    moves.append({
+        'from': tank_a['name'],
+        'to': tank_empty['name'],
+        'volume': move_a_to_e,
+        'blend_breakdown': {k: v * (move_a_to_e / va) for k, v in tank_a['blend_breakdown'].items()},
+    })
+
+    # Step 2: Move half of the second tank's current volume to the empty tank as above
+    move_b_to_e = vb / 2
+    moves.append({
+        'from': tank_b['name'],
+        'to': tank_empty['name'],
+        'volume': move_b_to_e,
+        'blend_breakdown': {k: v * (move_b_to_e / vb) for k, v in tank_b['blend_breakdown'].items()},
+    })
+
+    # Step 3: Move all remaining wine from the first tank to the second tank
+    move_a_to_b = va - move_a_to_e
+    moves.append({
+        'from': tank_a['name'],
+        'to': tank_b['name'],
+        'volume': move_a_to_b,
+        'blend_breakdown': {k: v * ((va - move_a_to_e) / va) for k, v in tank_a['blend_breakdown'].items()},
+    })
+
+    return moves
+
+#def apply_transfer(tanks, move):
+#    """Apply a single transfer move to the tank list in place."""
+#    tank_from = next(t for t in tanks if t['name'] == move['from'])
+#    tank_to = next(t for t in tanks if t['name'] == move['to'])
+#
+#    # Subtract volume and blend from source tank
+#    tank_from['current_volume'] -= move['volume']
+#    for k, v in move['blend_breakdown'].items():
+#        tank_from['blend_breakdown'][k] = tank_from['blend_breakdown'].get(k, 0) - v
+#        # Clean up any zero (or negative) blend components
+#        if tank_from['blend_breakdown'][k] <= 0:
+#            del tank_from['blend_breakdown'][k]
+#
+#    # Add volume and blend to destination tank
+#    tank_to['current_volume'] += move['volume']
+#    for k, v in move['blend_breakdown'].items():
+#        tank_to['blend_breakdown'][k] = tank_to['blend_breakdown'].get(k, 0) + v
+
+def apply_transfer(tanks, move):
+    """Apply a single transfer move to the tank list in place and check feasibility."""
+    tank_from = next(t for t in tanks if t['name'] == move['from'])
+    tank_to = next(t for t in tanks if t['name'] == move['to'])
+
+    max_from = float(tank_from['current_volume'])
+    max_to = float(tank_to['capacity']) - float(tank_to.get('current_volume', 0))
+    amount = min(move['volume'], max_from, max_to)
+
+    if amount <= 0:
+        return  # Do nothing if no valid transfer
+
+    # Scale blend_breakdown if the transfer is less than requested
+    if amount != move['volume']:
+        scale = amount / move['volume']
+        blend_breakdown = {k: v * scale for k, v in move['blend_breakdown'].items()}
+    else:
+        blend_breakdown = move['blend_breakdown']
+
+    # Subtract volume and blend from source tank
+    tank_from['current_volume'] -= amount
+    for k, v in blend_breakdown.items():
+        tank_from['blend_breakdown'][k] = tank_from['blend_breakdown'].get(k, 0) - v
+        # Clean up any zero (or negative) blend components
+        if tank_from['blend_breakdown'][k] <= 0:
+            del tank_from['blend_breakdown'][k]
+
+    # Add volume and blend to destination tank
+    tank_to['current_volume'] += amount
+    for k, v in blend_breakdown.items():
+        tank_to['blend_breakdown'][k] = tank_to['blend_breakdown'].get(k, 0) + v
+
 # --- Tank Management Endpoints ---
 
 @app.route('/tanks', methods=['GET'])
@@ -223,7 +321,7 @@ def can_make_blend(target_ratios, source_tanks, target_tanks):
     total_available = sum(float(t['current_volume']) for t in source_tanks)
     if total_available < total_required:
         return False
-    # Check for each blend: enough in source to meet ratio in targets?
+    # Check for each blend: is there enough in source to meet ratio in targets?
     for blend, pct in target_ratios.items():
         required = (pct / 100) * total_required
         available = sum(float(t['current_volume']) for t in source_tanks if normalize_blend(t['blend']) == blend)
@@ -372,10 +470,6 @@ def generate_blend_plan():
     full_tanks = [t for t in working_tanks if not t['is_empty'] and float(t.get('current_volume', 0)) > 0]
     empty_tanks = [t for t in working_tanks if t['is_empty'] or float(t.get('current_volume', 0)) == 0]
 
-    # Now recalculate full/empty after consolidation
-    # full_tanks = [t for t in working_tanks if not t['is_empty'] and float(t.get('current_volume', 0)) > 0]
-    # empty_tanks = [t for t in working_tanks if t['is_empty'] or float(t.get('current_volume', 0)) == 0]
-
     # Check if further blending is needed
     if blending_is_not_needed(working_tanks, blend_percentages):
         blend_gallons = {blend: round(gal, 4) for blend, gal in blend_totals.items()}
@@ -397,7 +491,7 @@ def generate_blend_plan():
     best_num_tanks = float('inf')
     best_num_transfers = float('inf')
 
-    for attempt in range(40):
+    for attempt in range(100):
         shuffled_empties = copy.deepcopy(empty_tanks)
         random.shuffle(shuffled_empties)
 
@@ -413,6 +507,16 @@ def generate_blend_plan():
         wine_left = total_wine
 
         plan = copy.deepcopy(consolidation_transfer_plan)
+
+        # Check for double-swap potential and add to blend plan if possible
+        if len(full_tanks) >= 2 and len(empty_tanks) >= 1:
+            tank_a, tank_b = random.sample(full_tanks,2)
+            tank_empty = empty_tanks[0]
+        
+            moves = double_swap(tank_a, tank_b, tank_empty)
+            for move in moves:
+                apply_transfer(tanks, move)
+                best_plan.append(move)
 
         # Move wine into empty tanks according to blend percentages
         for etank in shuffled_empties:
@@ -496,7 +600,7 @@ def generate_blend_plan():
                     best_num_tanks = len(tanks_with_wine)
                     best_num_transfers = len(plan)
 
-        print("==== BLEND DEBUG DUMP ====")
+        print("==== BLEND DEBUG ====")
         print("blend_totals:", blend_totals)
         print("blend_percentages:", blend_percentages)
         print("Attempted plans:", attempt+1)
