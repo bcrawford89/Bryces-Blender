@@ -515,24 +515,31 @@ def generate_blend_plan():
         plan = copy.deepcopy(consolidation_transfer_plan)
 
         # Check for double-swap potential and add to blend plan if possible
-        if len(full_tanks) >= 2 and len(empty_tanks) >= 1:
-            tank_a, tank_b = random.sample(full_tanks,2)
-            tank_empty = empty_tanks[0]
-            moves = double_swap(tank_a, tank_b, tank_empty)
-            for move in moves:
-                apply_transfer(trial_tanks, move)
-                plan.append(move)
+        while True:
+            # Keep full and empty tanks up to date after each pass
+            full_tanks = [t for t in trial_tanks if float(t['current_volume']) > 0]
+            empty_tanks = [t for t in trial_tanks if float(t['current_volume']) == 0]
+            # Double-swap loop
+            if len(full_tanks) >= 2 and len(empty_tanks) >= 1:
+                tank_a, tank_b = random.sample(full_tanks,2)
+                tank_empty = empty_tanks[0]
+                moves = double_swap(tank_a, tank_b, tank_empty)
+                for move in moves:
+                    apply_transfer(trial_tanks, move)
+                    plan.append(move)
+            else:
+                break
 
-            # Check if double-swapped plan is already valid and optimal
-            tanks_with_wine = [t for t in trial_tanks if float(t.get('current_volume', 0)) > 0]
-            if blending_is_not_needed(tanks_with_wine, blend_percentages, tolerance=2.0):
-                if len(tanks_with_wine) <= best_num_tanks:
-                    if len(tanks_with_wine) < best_num_tanks or len(plan) < best_num_transfers:
-                        best_plan = copy.deepcopy(plan)
-                        best_num_tanks = len(tanks_with_wine)
-                        best_num_transfers = len(plan)
-               # Skip further blending attempts for this trial
-                continue
+        # Check if double-swapped plan is already valid and optimal
+        tanks_with_wine = [t for t in trial_tanks if float(t.get('current_volume', 0)) > 0]
+        if blending_is_not_needed(tanks_with_wine, blend_percentages, tolerance=2.0):
+            if len(tanks_with_wine) <= best_num_tanks:
+                if len(tanks_with_wine) < best_num_tanks or len(plan) < best_num_transfers:
+                    best_plan = copy.deepcopy(plan)
+                    best_num_tanks = len(tanks_with_wine)
+                    best_num_transfers = len(plan)
+            # Skip further blending attempts for this trial
+            continue
 
         # Move wine into empty tanks according to blend percentages
         for etank in shuffled_empties:
