@@ -512,11 +512,13 @@ def generate_blend_plan():
         if len(full_tanks) >= 2 and len(empty_tanks) >= 1:
             tank_a, tank_b = random.sample(full_tanks,2)
             tank_empty = empty_tanks[0]
-        
             moves = double_swap(tank_a, tank_b, tank_empty)
             for move in moves:
                 apply_transfer(tanks, move)
                 best_plan.append(move)
+        else:
+            # Only throw a tank space error if consolidation into single tank isn't possible
+            pass
 
         # Move wine into empty tanks according to blend percentages
         for etank in shuffled_empties:
