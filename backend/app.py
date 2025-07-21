@@ -514,19 +514,33 @@ def generate_blend_plan():
 
         plan = copy.deepcopy(consolidation_transfer_plan)
 
-        # Check for double-swap potential and add to blend plan if possible
-        while True:
-            # Keep full and empty tanks up to date after each pass
+        #-- Double-swap loop START --#
+        
+        # Cap the number of swaps capable and count them
+        max_swaps = min(len([t for t in trial_tanks if float(t['current_volume']) > 0]) - 1,
+                    len([t for t in trial_tanks if float(t['current_volume']) == 0]))
+        swaps_done = 0
+        
+        while swaps_done < max_swaps:
+            # Keep full and empty tanks up to date
             full_tanks = [t for t in trial_tanks if float(t['current_volume']) > 0]
             empty_tanks = [t for t in trial_tanks if float(t['current_volume']) == 0]
-            # Double-swap loop
+            
             if len(full_tanks) >= 2 and len(empty_tanks) >= 1:
-                tank_a, tank_b = random.sample(full_tanks,2)
+                # Always pick two largest full tanks and empty tank
+                full_tanks = sorted(full_tanks, key=lambda t: -float(t['current_volume']))
+                empty_tanks = sorted(empty_tanks, key=lambda t: -float(t['capacity']))
+                tank_a, tank_b = full_tanks[0], full_tanks[1]
                 tank_empty = empty_tanks[0]
                 moves = double_swap(tank_a, tank_b, tank_empty)
                 for move in moves:
                     apply_transfer(trial_tanks, move)
                     plan.append(move)
+                swaps_done += 1
+                # If number of full tanks does't go down break the loop
+                new_full_tanks = [t for t in trial_tanks if float(t['current_volume']) > 0]
+                if len(new_full_tanks) >= len(full_tanks):
+                    break
             else:
                 break
 
@@ -540,6 +554,8 @@ def generate_blend_plan():
                     best_num_transfers = len(plan)
             # Skip further blending attempts for this trial
             continue
+
+        #-- END Double-swap loop --#
 
         # Move wine into empty tanks according to blend percentages
         for etank in shuffled_empties:
